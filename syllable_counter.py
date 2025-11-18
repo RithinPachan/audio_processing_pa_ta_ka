@@ -154,20 +154,28 @@ def detect_peaks(audio_data, sample_rate):
             global_peaks = [start + p for p in window_peaks if start + p < len(envelope)]
             all_peaks.extend(global_peaks)
     
-    # Consensus voting
-    peak_votes = {}
+    # Consensus voting - optimized O(n log n) approach
     tolerance = int(0.04 * sample_rate)
     
-    for peak in all_peaks:
-        nearby = [p for p in all_peaks if abs(p - peak) <= tolerance]
-        consensus = int(np.median(nearby))
-        
-        if consensus not in peak_votes:
-            peak_votes[consensus] = 0
-        peak_votes[consensus] += len(nearby)
+    sorted_peaks = sorted(all_peaks)
     
-    final_peaks = [peak for peak, votes in peak_votes.items() if votes >= 2]
-    final_peaks.sort()
+    clusters = []
+    if sorted_peaks:
+        current_cluster = [sorted_peaks[0]]
+        
+        for peak in sorted_peaks[1:]:
+            if peak - current_cluster[-1] <= tolerance:
+                current_cluster.append(peak)
+            else:
+                clusters.append(current_cluster)
+                current_cluster = [peak]
+        clusters.append(current_cluster)
+    
+    final_peaks = []
+    for cluster in clusters:
+        if len(cluster) >= 2:  # Requires agreement from at least 2 peaks
+            consensus_position = int(np.median(cluster))
+            final_peaks.append(consensus_position)
     
     print(f"Detected {len(final_peaks)} consensus peaks")
     return final_peaks
